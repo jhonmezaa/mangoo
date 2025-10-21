@@ -89,10 +89,9 @@ export class MangooStack extends cdk.Stack {
       removalPolicy: cdk.RemovalPolicy.SNAPSHOT,
     });
 
-    // Enable pgvector extension
-    const initDbLambda = new cdk.CustomResource(this, 'InitDbCustomResource', {
-      serviceToken: this.createInitDbFunction(vpc, dbSecurityGroup, dbCluster, dbPasswordSecret),
-    });
+    // TODO: Enable pgvector extension via backend initialization
+    // For now, pgvector can be enabled manually:
+    // CREATE EXTENSION IF NOT EXISTS vector;
 
     // ========================================
     // Cognito User Pool
@@ -380,16 +379,5 @@ export class MangooStack extends cdk.Stack {
       value: alb.loadBalancerDnsName,
       description: 'Application Load Balancer DNS',
     });
-  }
-
-  private createInitDbFunction(
-    vpc: ec2.IVpc,
-    dbSecurityGroup: ec2.SecurityGroup,
-    dbCluster: rds.IDatabaseCluster,
-    secret: secretsmanager.ISecret
-  ): string {
-    // This would create a Lambda function to initialize the database with pgvector
-    // For brevity, returning a placeholder
-    return 'arn:aws:lambda:us-east-1:123456789012:function:placeholder';
   }
 }
