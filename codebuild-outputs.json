@@ -1,0 +1,8 @@
+{
+  "MangooCodeBuildStack": {
+    "CodeBuildProjectName": "mangoo-build-deploy",
+    "ArtifactBucketName": "mangoo-artifacts-664349461262",
+    "BuildLogGroupName": "/aws/codebuild/mangoo",
+    "CodeBuildProjectArn": "arn:aws:codebuild:us-east-1:664349461262:project/mangoo-build-deploy"
+  }
+}

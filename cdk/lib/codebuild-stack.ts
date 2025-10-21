@@ -250,17 +250,14 @@ export class CodeBuildStack extends cdk.Stack {
       description: 'Build and deploy Mangoo AI Platform',
       role: buildRole,
 
-      // Source from GitHub
+      // Use GitHub source without OAuth - will clone in buildspec
       source: codebuild.Source.gitHub({
         owner: props.githubRepo.split('/')[0],
         repo: props.githubRepo.split('/')[1],
         branchOrRef: githubBranch,
-        webhook: false, // Webhook must be configured manually via AWS Console or GitHub OAuth
-        // webhookFilters: [
-        //   codebuild.FilterGroup.inEventOf(
-        //     codebuild.EventAction.PUSH
-        //   ).andBranchIs(githubBranch),
-        // ],
+        cloneDepth: 1,
+        webhook: false,
+        reportBuildStatus: false,
       }),
 
       // Build environment
