@@ -30,11 +30,11 @@ export class CodeBuildStack extends cdk.Stack {
       lifecycleRules: [
         {
           enabled: true,
-          expiration: cdk.Duration.days(30),
+          expiration: cdk.Duration.days(90),
           transitions: [
             {
               storageClass: s3.StorageClass.INFREQUENT_ACCESS,
-              transitionAfter: cdk.Duration.days(7),
+              transitionAfter: cdk.Duration.days(30),
             },
           ],
         },
