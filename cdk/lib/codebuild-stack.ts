@@ -262,15 +262,16 @@ export class CodeBuildStack extends cdk.Stack {
             },
             commands: [
               'echo "Cloning repository..."',
-              `git clone --depth 1 https://github.com/${props.githubRepo}.git repo`,
-              'cd repo',
+              `git clone --depth 1 https://github.com/${props.githubRepo}.git /tmp/repo`,
+              'cp -r /tmp/repo/. .',
+              'rm -rf /tmp/repo',
+              'ls -la',
               'echo "Installing AWS CDK..."',
               'npm install -g aws-cdk@latest',
             ],
           },
           pre_build: {
             commands: [
-              'cd repo',
               'echo "Installing dependencies..."',
               'cd backend && pip install --upgrade pip && pip install -r requirements.txt && cd ..',
               'cd cdk && npm ci && cd ..',
@@ -279,7 +280,6 @@ export class CodeBuildStack extends cdk.Stack {
           },
           build: {
             commands: [
-              'cd repo',
               'export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)',
               'export AWS_REGION=us-east-1',
               'export ECR_REGISTRY=${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com',
