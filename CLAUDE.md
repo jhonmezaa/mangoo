@@ -78,7 +78,7 @@ docker build -t mangoo-frontend ./frontend
 
 ### Backend Architecture
 
-The backend follows a modular FastAPI structure:
+The backend follows a modular FastAPI structure running directly with Uvicorn (no NGINX):
 
 - **app/api/routes/**: API endpoints organized by domain (chat, bots, knowledge, agents, users)
 - **app/services/**: Business logic services (bedrock_service, vector_service)
@@ -88,11 +88,14 @@ The backend follows a modular FastAPI structure:
 
 **Key Patterns**:
 
-1. **Async/Await**: All database operations and Bedrock calls use async
-2. **Dependency Injection**: FastAPI's `Depends()` for database sessions and auth
-3. **SSE Streaming**: Chat endpoint streams responses using `StreamingResponse` and async generators
-4. **Repository Pattern**: Services abstract database operations from routes
-5. **Pydantic Models**: Request/response validation with Pydantic schemas
+1. **Direct Uvicorn Deployment**: No reverse proxy (NGINX) in the container
+2. **Proxy Headers**: Uvicorn configured with `--proxy-headers` and `--forwarded-allow-ips="*"`
+3. **Async/Await**: All database operations and Bedrock calls use async
+4. **Dependency Injection**: FastAPI's `Depends()` for database sessions and auth
+5. **SSE Streaming**: Chat endpoint streams responses using `StreamingResponse` and async generators
+6. **ALB Integration**: Application Load Balancer with 120s idle timeout for SSE support
+7. **Repository Pattern**: Services abstract database operations from routes
+8. **Pydantic Models**: Request/response validation with Pydantic schemas
 
 ### Database Schema Key Points
 
@@ -222,11 +225,13 @@ Required:
 ## Known Issues and Gotchas
 
 1. **pgvector dimension**: Titan Embeddings v2 uses 1024, not 1536 (v1)
-2. **SSE buffering**: Nginx and ALB must disable buffering for SSE to work
-3. **Cognito JWT**: Use `cognito:groups` claim for role-based access
-4. **ECS health checks**: Use `/health` endpoint, not `/`
-5. **Aurora Serverless v2**: Min ACU must be ≥ 0.5 for pgvector
-6. **Bedrock streaming**: Use `converse_stream()` API, not legacy `invoke_model_with_response_stream()`
+2. **SSE streaming**: No NGINX in backend container - Uvicorn handles SSE directly
+3. **ALB idle timeout**: Must be set to 120s minimum for SSE connections
+4. **Proxy headers**: Uvicorn must use `--proxy-headers` flag to trust ALB headers
+5. **Cognito JWT**: Use `cognito:groups` claim for role-based access
+6. **ECS health checks**: Use `/health` endpoint, not `/`
+7. **Aurora Serverless v2**: Min ACU must be ≥ 0.5 for pgvector
+8. **Bedrock streaming**: Use `converse_stream()` API, not legacy `invoke_model_with_response_stream()`
 
 ## Security Considerations
 

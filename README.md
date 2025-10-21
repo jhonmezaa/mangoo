@@ -6,12 +6,13 @@ A modern multi-agent AI platform built on AWS, featuring conversational AI, RAG 
 
 Mangoo is a scalable, serverless-first platform that combines:
 
-- **Backend**: FastAPI + Uvicorn running on ECS Fargate
+- **Backend**: FastAPI + Uvicorn (direct, no NGINX) on ECS Fargate
 - **Database**: Aurora PostgreSQL Serverless v2 with pgvector extension
 - **AI**: Amazon Bedrock (Claude, Titan Embeddings)
 - **Auth**: Amazon Cognito
 - **Frontend**: React + Tailwind CSS + Vite
 - **Infrastructure**: AWS CDK (TypeScript)
+- **Load Balancing**: Application Load Balancer with 120s idle timeout for SSE
 - **CI/CD**: GitHub Actions
 
 ### Key Features
@@ -438,9 +439,11 @@ aws ecs execute-command --cluster mangoo-cluster --task <task-id> \
 
 ### SSE Not Streaming
 
-- Check ALB idle timeout (must be ≥ 120s)
-- Verify `proxy_buffering off` in nginx
+- Check ALB idle timeout (must be ≥ 120s in CDK stack)
+- Verify Uvicorn is running with `--proxy-headers` flag
+- Ensure no buffering middleware between ALB and ECS
 - Check CloudWatch logs for errors
+- Test SSE endpoint directly: `curl -N http://alb-endpoint/api/v1/chat/stream`
 
 ### Bedrock Access Denied
 

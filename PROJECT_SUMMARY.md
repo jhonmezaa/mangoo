@@ -8,10 +8,12 @@
 
 | Feature | Bedrock Chat | Mangoo AI |
 |---------|--------------|-----------|
-| Compute | Lambda / AppRunner | ECS Fargate |
+| Compute | Lambda / AppRunner | ECS Fargate (Uvicorn direct) |
 | Database | DynamoDB + OpenSearch | Aurora PostgreSQL + pgvector |
 | Vector Search | OpenSearch | pgvector (native PostgreSQL) |
 | Architecture | Monolithic | Modular, multi-agent ready |
+| Reverse Proxy | API Gateway + CloudFront | API Gateway + ALB (no NGINX) |
+| SSE Support | Native Lambda streaming | Direct Uvicorn with ALB 120s timeout |
 | Cost (estimate) | ~$150-300/month | ~$50-100/month |
 | Scalability | Limited by Lambda | Auto-scaling ECS tasks |
 | RAG Performance | Good | Excellent (native pgvector) |

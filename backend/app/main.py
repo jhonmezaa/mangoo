@@ -1,8 +1,10 @@
 """
 Main FastAPI application entry point.
+Configured for direct deployment with Uvicorn (no NGINX).
 """
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from contextlib import asynccontextmanager
 
 from app.core.config import settings
@@ -28,16 +30,20 @@ app = FastAPI(
     version=settings.APP_VERSION,
     lifespan=lifespan,
     docs_url="/docs",
-    redoc_url="/redoc"
+    redoc_url="/redoc",
+    # Important: Trust proxy headers from ALB
+    root_path="",
+    openapi_url="/api/v1/openapi.json",
 )
 
-# CORS middleware
+# CORS middleware - must be before other middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 # Include routers

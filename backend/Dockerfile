@@ -22,7 +22,15 @@ EXPOSE 8000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import requests; requests.get('http://localhost:8000/health')"
+    CMD python -c "import requests; requests.get('http://localhost:8000/health', timeout=5)"
 
-# Run application
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Run application directly with Uvicorn (no NGINX)
+# --proxy-headers: Trust X-Forwarded-* headers from ALB
+# --forwarded-allow-ips: Accept forwarded headers from any proxy
+# --host 0.0.0.0: Listen on all interfaces
+# --port 8000: Application port
+CMD ["uvicorn", "app.main:app", \
+     "--host", "0.0.0.0", \
+     "--port", "8000", \
+     "--proxy-headers", \
+     "--forwarded-allow-ips", "*"]

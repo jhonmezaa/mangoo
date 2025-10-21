@@ -245,7 +245,8 @@ export class MangooStack extends cdk.Stack {
     });
 
     // ========================================
-    // Application Load Balancer
+    // Application Load Balancer (Internal)
+    // Configured for SSE streaming support
     // ========================================
     const alb = new elbv2.ApplicationLoadBalancer(this, 'MangooALB', {
       vpc,
@@ -253,6 +254,8 @@ export class MangooStack extends cdk.Stack {
       vpcSubnets: {
         subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
       },
+      // Critical for SSE: ALB must keep connections open
+      idleTimeout: cdk.Duration.seconds(120),
     });
 
     const listener = alb.addListener('HttpListener', {
@@ -260,7 +263,7 @@ export class MangooStack extends cdk.Stack {
       protocol: elbv2.ApplicationProtocol.HTTP,
     });
 
-    listener.addTargets('BackendTarget', {
+    const targetGroup = listener.addTargets('BackendTarget', {
       port: 8000,
       protocol: elbv2.ApplicationProtocol.HTTP,
       targets: [backendService],
@@ -274,6 +277,23 @@ export class MangooStack extends cdk.Stack {
       deregistrationDelay: cdk.Duration.seconds(30),
       stickinessCookieDuration: cdk.Duration.hours(1),
     });
+
+    // Configure target group attributes for SSE
+    const cfnTargetGroup = targetGroup.node.defaultChild as elbv2.CfnTargetGroup;
+    cfnTargetGroup.addPropertyOverride('TargetGroupAttributes', [
+      {
+        Key: 'deregistration_delay.timeout_seconds',
+        Value: '30',
+      },
+      {
+        Key: 'stickiness.enabled',
+        Value: 'true',
+      },
+      {
+        Key: 'stickiness.type',
+        Value: 'lb_cookie',
+      },
+    ]);
 
     backendSecurityGroup.addIngressRule(
       alb,

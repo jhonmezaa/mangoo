@@ -178,9 +178,11 @@ async def chat_stream(
         event_generator(),
         media_type="text/event-stream",
         headers={
-            "Cache-Control": "no-cache",
-            "X-Accel-Buffering": "no",
+            "Cache-Control": "no-cache, no-transform",
+            "X-Accel-Buffering": "no",  # For NGINX (if ever added)
             "Connection": "keep-alive",
+            "Content-Type": "text/event-stream",
+            "Transfer-Encoding": "chunked",
         }
     )
 
