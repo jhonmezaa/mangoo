@@ -77,6 +77,8 @@ export class CodeBuildStack extends cdk.Stack {
           'ecr:CompleteLayerUpload',
           'ecr:CreateRepository',
           'ecr:DescribeRepositories',
+          'ecr:DescribeImages',
+          'ecr:ListImages',
         ],
         resources: ['*'],
       })
@@ -88,6 +90,25 @@ export class CodeBuildStack extends cdk.Stack {
         effect: iam.Effect.ALLOW,
         actions: ['s3:PutObject', 's3:GetObject', 's3:ListBucket'],
         resources: [this.artifactBucket.bucketArn, `${this.artifactBucket.bucketArn}/*`],
+      })
+    );
+
+    // S3 permissions for CDK bootstrap assets bucket
+    buildRole.addToPolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: [
+          's3:GetObject*',
+          's3:GetBucket*',
+          's3:List*',
+          's3:DeleteObject*',
+          's3:PutObject*',
+          's3:Abort*',
+        ],
+        resources: [
+          `arn:aws:s3:::cdk-hnb659fds-assets-${this.account}-${this.region}`,
+          `arn:aws:s3:::cdk-hnb659fds-assets-${this.account}-${this.region}/*`,
+        ],
       })
     );
 
@@ -133,6 +154,17 @@ export class CodeBuildStack extends cdk.Stack {
           'ssm:GetParameter',
         ],
         resources: [`arn:aws:ssm:${this.region}:${this.account}:parameter/cdk-bootstrap/*`],
+      })
+    );
+
+    // STS permissions to assume CDK roles
+    buildRole.addToPolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: ['sts:AssumeRole'],
+        resources: [
+          `arn:aws:iam::${this.account}:role/cdk-*`,
+        ],
       })
     );
 
