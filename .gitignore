@@ -25,6 +25,13 @@ yarn-error.log*
 .pnp.*
 dist/
 build/
+package-lock.json
+
+# TypeScript compiled files
+*.js
+*.d.ts
+!jest.config.js
+!vite.config.ts
 
 # Environment
 .env
