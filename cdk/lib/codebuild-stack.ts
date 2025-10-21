@@ -3,7 +3,6 @@ import * as codebuild from 'aws-cdk-lib/aws-codebuild';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as logs from 'aws-cdk-lib/aws-logs';
 import * as s3 from 'aws-cdk-lib/aws-s3';
-import * as s3deploy from 'aws-cdk-lib/aws-s3-deployment';
 import { Construct } from 'constructs';
 
 export interface CodeBuildStackProps extends cdk.StackProps {
@@ -251,15 +250,54 @@ export class CodeBuildStack extends cdk.Stack {
       description: 'Build and deploy Mangoo AI Platform',
       role: buildRole,
 
-      // Use S3 source (repository code uploaded via BucketDeployment)
-      // This approach is used by aws-samples/bedrock-chat to avoid GitHub OAuth
-      source: codebuild.Source.s3({
-        bucket: this.artifactBucket,
-        path: 'source/',
+      // Inline buildspec with git clone (bedrock-chat approach)
+      // NO_SOURCE - repository is cloned during build phase
+      buildSpec: codebuild.BuildSpec.fromObject({
+        version: '0.2',
+        phases: {
+          install: {
+            'runtime-versions': {
+              nodejs: 20,
+              python: 3.11,
+            },
+            commands: [
+              'echo "Cloning repository..."',
+              `git clone --depth 1 https://github.com/${props.githubRepo}.git repo`,
+              'cd repo',
+              'echo "Installing AWS CDK..."',
+              'npm install -g aws-cdk@latest',
+            ],
+          },
+          pre_build: {
+            commands: [
+              'cd repo',
+              'echo "Installing dependencies..."',
+              'cd backend && pip install --upgrade pip && pip install -r requirements.txt && cd ..',
+              'cd cdk && npm ci && cd ..',
+              'cd frontend && npm ci && cd ..',
+            ],
+          },
+          build: {
+            commands: [
+              'cd repo',
+              'export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)',
+              'export AWS_REGION=us-east-1',
+              'export ECR_REGISTRY=${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com',
+              'echo "Logging into ECR..."',
+              'aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ECR_REGISTRY}',
+              'echo "Creating ECR repositories..."',
+              'aws ecr describe-repositories --repository-names mangoo-backend --region ${AWS_REGION} || aws ecr create-repository --repository-name mangoo-backend --region ${AWS_REGION}',
+              'aws ecr describe-repositories --repository-names mangoo-frontend --region ${AWS_REGION} || aws ecr create-repository --repository-name mangoo-frontend --region ${AWS_REGION}',
+              'echo "Building and pushing backend..."',
+              'cd backend && docker build -t ${ECR_REGISTRY}/mangoo-backend:latest . && docker push ${ECR_REGISTRY}/mangoo-backend:latest && cd ..',
+              'echo "Building and pushing frontend..."',
+              'cd frontend && npm run build && docker build -t ${ECR_REGISTRY}/mangoo-frontend:latest . && docker push ${ECR_REGISTRY}/mangoo-frontend:latest && cd ..',
+              'echo "Deploying with CDK..."',
+              'cd cdk && npx cdk deploy --all --require-approval never',
+            ],
+          },
+        },
       }),
-
-      // Build spec from repository file
-      buildSpec: codebuild.BuildSpec.fromSourceFilename('buildspec.yml'),
 
       // Build environment
       environment: {
@@ -310,34 +348,6 @@ export class CodeBuildStack extends cdk.Stack {
       // VPC configuration (optional - uncomment if needed)
       // vpc: vpc,
       // subnetSelection: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
-    });
-
-    // ========================================
-    // Deploy source code to S3
-    // This approach is inspired by aws-samples/bedrock-chat
-    // ========================================
-    new s3deploy.BucketDeployment(this, 'DeploySource', {
-      sources: [s3deploy.Source.asset('../', {
-        exclude: [
-          '.git',
-          '.github',
-          'cdk/node_modules',
-          'cdk/cdk.out',
-          'cdk/bin/*.js',
-          'cdk/lib/*.js',
-          'cdk/**/*.d.ts',
-          'frontend/node_modules',
-          'frontend/dist',
-          'backend/__pycache__',
-          'backend/.venv',
-          'backend/venv',
-          '*.log',
-          '.DS_Store',
-        ],
-      })],
-      destinationBucket: this.artifactBucket,
-      destinationKeyPrefix: 'source/',
-      prune: false, // Keep old versions for rollback
     });
 
     // ========================================
