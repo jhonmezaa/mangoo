@@ -166,12 +166,15 @@ mangoo/
 - ✅ Custom metrics
 - ✅ Health checks
 
-### 8. CI/CD
-- ✅ GitHub Actions pipeline
-- ✅ Automated testing
-- ✅ Docker image builds
-- ✅ ECR pushes
-- ✅ ECS deployments
+### 8. CI/CD (AWS CodeBuild)
+- ✅ AWS CodeBuild pipeline (no GitHub Actions)
+- ✅ Automated builds on push to main
+- ✅ Docker image builds and ECR pushes
+- ✅ CDK infrastructure deployment
+- ✅ ECS service updates
+- ✅ Temporary IAM credentials (no static keys)
+- ✅ CloudWatch Logs integration
+- ✅ S3 artifact storage
 
 ## 🚀 Deployment Readiness
 

@@ -13,7 +13,7 @@ Mangoo is a scalable, serverless-first platform that combines:
 - **Frontend**: React + Tailwind CSS + Vite
 - **Infrastructure**: AWS CDK (TypeScript)
 - **Load Balancing**: Application Load Balancer with 120s idle timeout for SSE
-- **CI/CD**: GitHub Actions
+- **CI/CD**: AWS CodeBuild (native AWS integration, no static credentials)
 
 ### Key Features
 
@@ -53,7 +53,7 @@ mangoo/
 │   │   └── mangoo-stack.ts
 │   └── bin/cdk.ts
 ├── docs/                  # Additional documentation
-├── .github/workflows/     # CI/CD pipelines
+├── buildspec.yml          # AWS CodeBuild specification
 └── docker-compose.yml     # Local development
 ```
 
@@ -178,14 +178,50 @@ docker build -t <ECR-REGISTRY>/mangoo-frontend:latest .
 docker push <ECR-REGISTRY>/mangoo-frontend:latest
 ```
 
-### Step 5: Deploy ECS Services
+### Step 5: Set Up CI/CD with CodeBuild
 
-The CDK stack automatically creates and deploys the ECS services. Check deployment:
+Deploy the CodeBuild project:
 
 ```bash
-aws ecs list-services --cluster mangoo-cluster
-aws ecs describe-services --cluster mangoo-cluster --services <service-name>
+cd cdk
+cdk deploy MangooCodeBuildStack
 ```
+
+This creates:
+- CodeBuild project: `mangoo-build-deploy`
+- S3 bucket for artifacts
+- CloudWatch log group
+- GitHub webhook (automatic triggers on push to main)
+
+### Step 6: Trigger First Build
+
+Push code to GitHub to trigger automatic build:
+
+```bash
+git push origin main
+```
+
+Or trigger manually:
+
+```bash
+aws codebuild start-build --project-name mangoo-build-deploy
+```
+
+Monitor the build:
+
+```bash
+# View logs in real-time
+aws logs tail /aws/codebuild/mangoo --follow
+
+# Check build status
+aws codebuild list-builds-for-project --project-name mangoo-build-deploy
+```
+
+The CodeBuild pipeline will:
+1. Build backend and frontend Docker images
+2. Push images to ECR
+3. Deploy CDK stacks
+4. Update ECS services automatically
 
 ## Configuration
 

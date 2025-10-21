@@ -1,0 +1,187 @@
+version: 0.2
+
+# AWS CodeBuild Buildspec for Mangoo AI Platform
+# Builds backend Docker image, frontend, and deploys via CDK
+
+env:
+  variables:
+    # These can be overridden in CodeBuild project settings
+    AWS_DEFAULT_REGION: us-east-1
+    IMAGE_TAG: latest
+  parameter-store:
+    # Store sensitive values in SSM Parameter Store (optional)
+    # COGNITO_USER_POOL_ID: /mangoo/cognito/user-pool-id
+    # COGNITO_APP_CLIENT_ID: /mangoo/cognito/app-client-id
+  exported-variables:
+    - IMAGE_TAG
+    - BACKEND_IMAGE_URI
+    - FRONTEND_IMAGE_URI
+
+phases:
+  install:
+    runtime-versions:
+      nodejs: 20
+      python: 3.11
+      docker: 20
+
+    commands:
+      - echo "Installing dependencies..."
+
+      # Install AWS CDK CLI globally
+      - npm install -g aws-cdk@latest
+
+      # Install backend dependencies
+      - cd backend
+      - pip install --upgrade pip
+      - pip install -r requirements.txt
+      - cd ..
+
+      # Install CDK dependencies
+      - cd cdk
+      - npm ci
+      - cd ..
+
+      # Install frontend dependencies
+      - cd frontend
+      - npm ci
+      - cd ..
+
+      - echo "Dependencies installed successfully"
+
+  pre_build:
+    commands:
+      - echo "Pre-build phase started on $(date)"
+
+      # Get AWS account ID and region
+      - export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+      - export AWS_REGION=${AWS_DEFAULT_REGION}
+      - export ECR_REGISTRY=${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
+
+      # Generate unique image tag from commit hash
+      - export IMAGE_TAG=${CODEBUILD_RESOLVED_SOURCE_VERSION:-latest}
+      - echo "Image tag is ${IMAGE_TAG}"
+
+      # Login to Amazon ECR
+      - echo "Logging in to Amazon ECR..."
+      - aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ECR_REGISTRY}
+
+      # Create ECR repositories if they don't exist
+      - |
+        aws ecr describe-repositories --repository-names mangoo-backend --region ${AWS_REGION} 2>/dev/null || \
+        aws ecr create-repository --repository-name mangoo-backend --region ${AWS_REGION} \
+          --image-scanning-configuration scanOnPush=true \
+          --encryption-configuration encryptionType=AES256
+
+      - |
+        aws ecr describe-repositories --repository-names mangoo-frontend --region ${AWS_REGION} 2>/dev/null || \
+        aws ecr create-repository --repository-name mangoo-frontend --region ${AWS_REGION} \
+          --image-scanning-configuration scanOnPush=true \
+          --encryption-configuration encryptionType=AES256
+
+      - echo "ECR login successful"
+
+  build:
+    commands:
+      - echo "Build phase started on $(date)"
+
+      # Build backend Docker image
+      - echo "Building backend Docker image..."
+      - cd backend
+      - docker build --platform linux/amd64 -t mangoo-backend:${IMAGE_TAG} -t mangoo-backend:latest .
+      - docker tag mangoo-backend:${IMAGE_TAG} ${ECR_REGISTRY}/mangoo-backend:${IMAGE_TAG}
+      - docker tag mangoo-backend:${IMAGE_TAG} ${ECR_REGISTRY}/mangoo-backend:latest
+      - cd ..
+
+      # Build frontend
+      - echo "Building frontend..."
+      - cd frontend
+      - npm run build
+      - cd ..
+
+      # Build frontend Docker image
+      - echo "Building frontend Docker image..."
+      - cd frontend
+      - docker build --platform linux/amd64 -t mangoo-frontend:${IMAGE_TAG} -t mangoo-frontend:latest .
+      - docker tag mangoo-frontend:${IMAGE_TAG} ${ECR_REGISTRY}/mangoo-frontend:${IMAGE_TAG}
+      - docker tag mangoo-frontend:${IMAGE_TAG} ${ECR_REGISTRY}/mangoo-frontend:latest
+      - cd ..
+
+      # Export image URIs for later use
+      - export BACKEND_IMAGE_URI=${ECR_REGISTRY}/mangoo-backend:${IMAGE_TAG}
+      - export FRONTEND_IMAGE_URI=${ECR_REGISTRY}/mangoo-frontend:${IMAGE_TAG}
+
+      - echo "Build phase completed successfully"
+
+  post_build:
+    commands:
+      - echo "Post-build phase started on $(date)"
+
+      # Push backend image to ECR
+      - echo "Pushing backend image to ECR..."
+      - docker push ${ECR_REGISTRY}/mangoo-backend:${IMAGE_TAG}
+      - docker push ${ECR_REGISTRY}/mangoo-backend:latest
+
+      # Push frontend image to ECR
+      - echo "Pushing frontend image to ECR..."
+      - docker push ${ECR_REGISTRY}/mangoo-frontend:${IMAGE_TAG}
+      - docker push ${ECR_REGISTRY}/mangoo-frontend:latest
+
+      - echo "Images pushed successfully"
+
+      # Deploy infrastructure with CDK
+      - echo "Deploying infrastructure with CDK..."
+      - cd cdk
+
+      # Synthesize CDK stack
+      - npx cdk synth
+
+      # Deploy CDK stack (requires approval for changes)
+      # Use --require-approval never for automated deployment
+      - npx cdk deploy --all --require-approval never --outputs-file ../cdk-outputs.json
+
+      - cd ..
+
+      # Force new ECS deployment to pick up new images
+      - echo "Updating ECS service..."
+      - |
+        aws ecs update-service \
+          --cluster mangoo-cluster \
+          --service mangoo-backend-service \
+          --force-new-deployment \
+          --region ${AWS_REGION} || echo "ECS service not found or already updating"
+
+      - echo "Deployment completed successfully"
+
+      # Display outputs
+      - echo "=== Deployment Summary ==="
+      - echo "Backend Image: ${BACKEND_IMAGE_URI}"
+      - echo "Frontend Image: ${FRONTEND_IMAGE_URI}"
+      - echo "Image Tag: ${IMAGE_TAG}"
+      - cat cdk-outputs.json || echo "CDK outputs not available"
+
+artifacts:
+  files:
+    - cdk-outputs.json
+    - backend/**/*
+    - frontend/dist/**/*
+    - cdk/cdk.out/**/*
+  name: mangoo-build-$(date +%Y%m%d-%H%M%S)
+
+reports:
+  backend-tests:
+    files:
+      - 'backend/test-results/**/*'
+    file-format: 'JUNITXML'
+
+  frontend-tests:
+    files:
+      - 'frontend/test-results/**/*'
+    file-format: 'JUNITXML'
+
+cache:
+  paths:
+    - 'backend/.venv/**/*'
+    - 'frontend/node_modules/**/*'
+    - 'cdk/node_modules/**/*'
+    - '/root/.npm/**/*'
+    - '/root/.cache/pip/**/*'

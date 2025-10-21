@@ -14,7 +14,7 @@ Mangoo is a multi-agent AI platform built on AWS with FastAPI backend, React fro
 - **AI**: Amazon Bedrock (Claude 3.5 Sonnet, Titan Embeddings v2)
 - **Auth**: Amazon Cognito with JWT
 - **Infrastructure**: AWS CDK (TypeScript), ECS Fargate, ALB, API Gateway, WAF
-- **CI/CD**: GitHub Actions
+- **CI/CD**: AWS CodeBuild (native AWS, no static credentials)
 
 ## Development Commands
 
