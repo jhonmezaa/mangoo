@@ -296,7 +296,7 @@ export class MangooStack extends cdk.Stack {
     ]);
 
     backendSecurityGroup.addIngressRule(
-      alb,
+      ec2.Peer.securityGroupId(alb.connections.securityGroups[0].securityGroupId),
       ec2.Port.tcp(8000),
       'Allow ALB to access backend'
     );
