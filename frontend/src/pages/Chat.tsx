@@ -14,7 +14,6 @@ export default function Chat() {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
-  const [chatId] = useState(`chat_${Date.now()}`)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   const scrollToBottom = () => {
@@ -37,43 +36,59 @@ export default function Chat() {
       const token = await authService.getAccessToken()
       const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
-      const eventSource = new EventSource(
-        `${API_URL}/api/v1/chat/stream`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      )
+      // Use fetch for streaming with custom headers
+      const response = await fetch(`${API_URL}/api/v1/chat/stream`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          bot_id: botId,
+          message: input,
+        }),
+      })
 
+      if (!response.ok || !response.body) {
+        throw new Error('Failed to connect to stream')
+      }
+
+      const reader = response.body.getReader()
+      const decoder = new TextDecoder()
       let assistantMessage = ''
 
-      eventSource.addEventListener('message', (event) => {
-        const data = JSON.parse(event.data)
-        if (data.content) {
-          assistantMessage += data.content
-          setMessages((prev) => {
-            const newMessages = [...prev]
-            if (newMessages[newMessages.length - 1]?.role === 'assistant') {
-              newMessages[newMessages.length - 1].content = assistantMessage
-            } else {
-              newMessages.push({ role: 'assistant', content: assistantMessage })
+      // Read the stream
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        const chunk = decoder.decode(value)
+        const lines = chunk.split('\n')
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6))
+              if (data.content) {
+                assistantMessage += data.content
+                setMessages((prev) => {
+                  const newMessages = [...prev]
+                  if (newMessages[newMessages.length - 1]?.role === 'assistant') {
+                    newMessages[newMessages.length - 1].content = assistantMessage
+                  } else {
+                    newMessages.push({ role: 'assistant', content: assistantMessage })
+                  }
+                  return newMessages
+                })
+              }
+            } catch (e) {
+              // Ignore parse errors for incomplete chunks
             }
-            return newMessages
-          })
+          }
         }
-      })
+      }
 
-      eventSource.addEventListener('done', () => {
-        eventSource.close()
-        setLoading(false)
-      })
-
-      eventSource.addEventListener('error', (error) => {
-        console.error('SSE Error:', error)
-        eventSource.close()
-        setLoading(false)
-      })
+      setLoading(false)
     } catch (error) {
       console.error('Error sending message:', error)
       setLoading(false)

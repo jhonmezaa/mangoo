@@ -22,7 +22,7 @@ export const useAuthStore = create<AuthState>()(
       clearAuth: () => set({ isAuthenticated: false, user: null }),
 
       signIn: async (username: string, password: string) => {
-        const tokens = await authService.signIn(username, password)
+        await authService.signIn(username, password)
         // After login, you might want to fetch user info from your API
         set({ isAuthenticated: true, user: { username } })
       },
