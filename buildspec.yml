@@ -73,17 +73,8 @@ phases:
       - aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ECR_REGISTRY}
 
       # Create ECR repositories if they don't exist
-      - |
-        aws ecr describe-repositories --repository-names mangoo-backend --region ${AWS_REGION} 2>/dev/null || \
-        aws ecr create-repository --repository-name mangoo-backend --region ${AWS_REGION} \
-          --image-scanning-configuration scanOnPush=true \
-          --encryption-configuration encryptionType=AES256
-
-      - |
-        aws ecr describe-repositories --repository-names mangoo-frontend --region ${AWS_REGION} 2>/dev/null || \
-        aws ecr create-repository --repository-name mangoo-frontend --region ${AWS_REGION} \
-          --image-scanning-configuration scanOnPush=true \
-          --encryption-configuration encryptionType=AES256
+      - aws ecr describe-repositories --repository-names mangoo-backend --region ${AWS_REGION} 2>/dev/null || aws ecr create-repository --repository-name mangoo-backend --region ${AWS_REGION} --image-scanning-configuration scanOnPush=true --encryption-configuration encryptionType=AES256
+      - aws ecr describe-repositories --repository-names mangoo-frontend --region ${AWS_REGION} 2>/dev/null || aws ecr create-repository --repository-name mangoo-frontend --region ${AWS_REGION} --image-scanning-configuration scanOnPush=true --encryption-configuration encryptionType=AES256
 
       - echo "ECR login successful"
 
@@ -150,12 +141,7 @@ phases:
 
       # Force new ECS deployment to pick up new images
       - echo "Updating ECS service..."
-      - |
-        aws ecs update-service \
-          --cluster mangoo-cluster \
-          --service mangoo-backend-service \
-          --force-new-deployment \
-          --region ${AWS_REGION} || echo "ECS service not found or already updating"
+      - aws ecs update-service --cluster mangoo-cluster --service mangoo-backend-service --force-new-deployment --region ${AWS_REGION} || echo "ECS service not found or already updating"
 
       - echo "Deployment completed successfully"
 
