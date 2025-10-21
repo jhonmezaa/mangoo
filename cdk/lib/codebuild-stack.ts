@@ -125,6 +125,17 @@ export class CodeBuildStack extends cdk.Stack {
       })
     );
 
+    // SSM permissions for CDK bootstrap version check
+    buildRole.addToPolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: [
+          'ssm:GetParameter',
+        ],
+        resources: [`arn:aws:ssm:${this.region}:${this.account}:parameter/cdk-bootstrap/*`],
+      })
+    );
+
     // IAM permissions for CDK (least privilege)
     buildRole.addToPolicy(
       new iam.PolicyStatement({
