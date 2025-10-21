@@ -3,6 +3,7 @@ import * as codebuild from 'aws-cdk-lib/aws-codebuild';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as logs from 'aws-cdk-lib/aws-logs';
 import * as s3 from 'aws-cdk-lib/aws-s3';
+import * as s3deploy from 'aws-cdk-lib/aws-s3-deployment';
 import { Construct } from 'constructs';
 
 export interface CodeBuildStackProps extends cdk.StackProps {
@@ -250,13 +251,11 @@ export class CodeBuildStack extends cdk.Stack {
       description: 'Build and deploy Mangoo AI Platform',
       role: buildRole,
 
-      // GitHub public repository source (no OAuth needed for public repos)
-      source: codebuild.Source.gitHub({
-        owner: props.githubRepo.split('/')[0],
-        repo: props.githubRepo.split('/')[1],
-        cloneDepth: 1,
-        webhook: false,
-        reportBuildStatus: false,
+      // Use S3 source (repository code uploaded via BucketDeployment)
+      // This approach is used by aws-samples/bedrock-chat to avoid GitHub OAuth
+      source: codebuild.Source.s3({
+        bucket: this.artifactBucket,
+        path: 'source/',
       }),
 
       // Build spec from repository file
@@ -311,6 +310,34 @@ export class CodeBuildStack extends cdk.Stack {
       // VPC configuration (optional - uncomment if needed)
       // vpc: vpc,
       // subnetSelection: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
+    });
+
+    // ========================================
+    // Deploy source code to S3
+    // This approach is inspired by aws-samples/bedrock-chat
+    // ========================================
+    new s3deploy.BucketDeployment(this, 'DeploySource', {
+      sources: [s3deploy.Source.asset('../', {
+        exclude: [
+          '.git',
+          '.github',
+          'cdk/node_modules',
+          'cdk/cdk.out',
+          'cdk/bin/*.js',
+          'cdk/lib/*.js',
+          'cdk/**/*.d.ts',
+          'frontend/node_modules',
+          'frontend/dist',
+          'backend/__pycache__',
+          'backend/.venv',
+          'backend/venv',
+          '*.log',
+          '.DS_Store',
+        ],
+      })],
+      destinationBucket: this.artifactBucket,
+      destinationKeyPrefix: 'source/',
+      prune: false, // Keep old versions for rollback
     });
 
     // ========================================
