@@ -250,8 +250,82 @@ export class CodeBuildStack extends cdk.Stack {
       description: 'Build and deploy Mangoo AI Platform',
       role: buildRole,
 
-      // NOTE: We don't specify source here - buildspec will clone the repo
-      // This avoids GitHub OAuth requirements for public repos
+      // Build spec inline - clones repo then continues with repo's buildspec
+      buildSpec: codebuild.BuildSpec.fromObject({
+        version: '0.2',
+        env: {
+          variables: {
+            AWS_DEFAULT_REGION: 'us-east-1',
+            IMAGE_TAG: 'latest',
+          },
+          'exported-variables': ['IMAGE_TAG', 'BACKEND_IMAGE_URI', 'FRONTEND_IMAGE_URI'],
+        },
+        phases: {
+          install: {
+            'runtime-versions': {
+              nodejs: 20,
+              python: 3.11,
+              docker: 20,
+            },
+            commands: [
+              'echo "Cloning repository https://github.com/$GITHUB_REPO (branch $GITHUB_BRANCH)..."',
+              'git clone --depth 1 --single-branch --branch $GITHUB_BRANCH https://github.com/$GITHUB_REPO.git repo',
+              'cd repo',
+              'ls -la',
+              'npm install -g aws-cdk@latest',
+              'cd backend && pip install --upgrade pip && pip install -r requirements.txt && cd ..',
+              'cd cdk && npm ci && cd ..',
+              'cd frontend && npm ci && cd ..',
+            ],
+          },
+          pre_build: {
+            commands: [
+              'cd repo',
+              'export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)',
+              'export AWS_REGION=${AWS_DEFAULT_REGION}',
+              'export ECR_REGISTRY=${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com',
+              'export IMAGE_TAG=${CODEBUILD_RESOLVED_SOURCE_VERSION:-latest}',
+              'aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ECR_REGISTRY}',
+              'aws ecr describe-repositories --repository-names mangoo-backend --region ${AWS_REGION} 2>/dev/null || aws ecr create-repository --repository-name mangoo-backend --region ${AWS_REGION} --image-scanning-configuration scanOnPush=true --encryption-configuration encryptionType=AES256',
+              'aws ecr describe-repositories --repository-names mangoo-frontend --region ${AWS_REGION} 2>/dev/null || aws ecr create-repository --repository-name mangoo-frontend --region ${AWS_REGION} --image-scanning-configuration scanOnPush=true --encryption-configuration encryptionType=AES256',
+            ],
+          },
+          build: {
+            commands: [
+              'cd repo/backend',
+              'docker build --platform linux/amd64 -t mangoo-backend:${IMAGE_TAG} -t mangoo-backend:latest .',
+              'docker tag mangoo-backend:${IMAGE_TAG} ${ECR_REGISTRY}/mangoo-backend:${IMAGE_TAG}',
+              'docker tag mangoo-backend:${IMAGE_TAG} ${ECR_REGISTRY}/mangoo-backend:latest',
+              'cd ../frontend',
+              'npm run build',
+              'docker build --platform linux/amd64 -t mangoo-frontend:${IMAGE_TAG} -t mangoo-frontend:latest .',
+              'docker tag mangoo-frontend:${IMAGE_TAG} ${ECR_REGISTRY}/mangoo-frontend:${IMAGE_TAG}',
+              'docker tag mangoo-frontend:${IMAGE_TAG} ${ECR_REGISTRY}/mangoo-frontend:latest',
+              'cd ..',
+              'export BACKEND_IMAGE_URI=${ECR_REGISTRY}/mangoo-backend:${IMAGE_TAG}',
+              'export FRONTEND_IMAGE_URI=${ECR_REGISTRY}/mangoo-frontend:${IMAGE_TAG}',
+            ],
+          },
+          post_build: {
+            commands: [
+              'cd repo',
+              'docker push ${ECR_REGISTRY}/mangoo-backend:${IMAGE_TAG}',
+              'docker push ${ECR_REGISTRY}/mangoo-backend:latest',
+              'docker push ${ECR_REGISTRY}/mangoo-frontend:${IMAGE_TAG}',
+              'docker push ${ECR_REGISTRY}/mangoo-frontend:latest',
+              'cd cdk',
+              'npx cdk synth',
+              'npx cdk deploy --all --require-approval never --outputs-file ../cdk-outputs.json',
+              'cd ..',
+              'aws ecs update-service --cluster mangoo-cluster --service mangoo-backend-service --force-new-deployment --region ${AWS_REGION} || echo "ECS service not found"',
+            ],
+          },
+        },
+        artifacts: {
+          files: ['repo/cdk-outputs.json', 'repo/backend/**/*', 'repo/frontend/dist/**/*'],
+          name: 'mangoo-build-artifacts',
+        },
+      }),
 
       // Build environment
       environment: {
@@ -282,10 +356,7 @@ export class CodeBuildStack extends cdk.Stack {
         },
       },
 
-      // Inline buildspec with git clone
-      buildSpec: codebuild.BuildSpec.fromAsset('../buildspec.yml'),
-
-      // Artifacts
+      // Artifacts (overridden by inline buildspec above)
       artifacts: codebuild.Artifacts.s3({
         bucket: this.artifactBucket,
         includeBuildId: true,
