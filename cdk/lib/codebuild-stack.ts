@@ -251,7 +251,6 @@ export class CodeBuildStack extends cdk.Stack {
       role: buildRole,
 
       // Inline buildspec with git clone (bedrock-chat approach)
-      // NO_SOURCE - repository is cloned during build phase
       buildSpec: codebuild.BuildSpec.fromObject({
         version: '0.2',
         phases: {
@@ -274,8 +273,8 @@ export class CodeBuildStack extends cdk.Stack {
             commands: [
               'echo "Installing dependencies..."',
               'cd backend && pip install --upgrade pip && pip install -r requirements.txt && cd ..',
-              'cd cdk && npm ci && cd ..',
-              'cd frontend && npm ci && cd ..',
+              'cd cdk && npm install && cd ..',
+              'cd frontend && npm install && cd ..',
             ],
           },
           build: {
