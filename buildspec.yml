@@ -8,7 +8,7 @@ env:
     # These can be overridden in CodeBuild project settings
     AWS_DEFAULT_REGION: us-east-1
     IMAGE_TAG: latest
-  parameter-store:
+  # parameter-store:
     # Store sensitive values in SSM Parameter Store (optional)
     # COGNITO_USER_POOL_ID: /mangoo/cognito/user-pool-id
     # COGNITO_APP_CLIENT_ID: /mangoo/cognito/app-client-id
