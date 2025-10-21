@@ -255,12 +255,12 @@ export class CodeBuildStack extends cdk.Stack {
         owner: props.githubRepo.split('/')[0],
         repo: props.githubRepo.split('/')[1],
         branchOrRef: githubBranch,
-        webhook: true, // Trigger on push
-        webhookFilters: [
-          codebuild.FilterGroup.inEventOf(
-            codebuild.EventAction.PUSH
-          ).andBranchIs(githubBranch),
-        ],
+        webhook: false, // Webhook must be configured manually via AWS Console or GitHub OAuth
+        // webhookFilters: [
+        //   codebuild.FilterGroup.inEventOf(
+        //     codebuild.EventAction.PUSH
+        //   ).andBranchIs(githubBranch),
+        // ],
       }),
 
       // Build environment
