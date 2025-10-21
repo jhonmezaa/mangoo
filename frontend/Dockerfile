@@ -1,5 +1,5 @@
 # Build stage
-FROM node:20-alpine as build
+FROM public.ecr.aws/docker/library/node:20-alpine AS build
 
 WORKDIR /app
 
@@ -7,7 +7,7 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install dependencies
-RUN npm ci
+RUN npm install
 
 # Copy source code
 COPY . .
@@ -16,7 +16,7 @@ COPY . .
 RUN npm run build
 
 # Production stage
-FROM nginx:alpine
+FROM public.ecr.aws/nginx/nginx:alpine
 
 # Copy built files
 COPY --from=build /app/dist /usr/share/nginx/html
