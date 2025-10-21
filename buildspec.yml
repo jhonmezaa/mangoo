@@ -27,6 +27,13 @@ phases:
     commands:
       - echo "Installing dependencies..."
 
+      # Clone repository from GitHub (public repository, no auth needed)
+      - echo "Cloning repository https://github.com/${GITHUB_REPO} (branch ${GITHUB_BRANCH})..."
+      - git clone --depth 1 --single-branch --branch ${GITHUB_BRANCH} https://github.com/${GITHUB_REPO}.git /tmp/repo
+      - cp -r /tmp/repo/. .
+      - rm -rf /tmp/repo
+      - ls -la
+
       # Install AWS CDK CLI globally
       - npm install -g aws-cdk@latest
 

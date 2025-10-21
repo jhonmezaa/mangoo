@@ -250,15 +250,8 @@ export class CodeBuildStack extends cdk.Stack {
       description: 'Build and deploy Mangoo AI Platform',
       role: buildRole,
 
-      // Use GitHub source without OAuth - will clone in buildspec
-      source: codebuild.Source.gitHub({
-        owner: props.githubRepo.split('/')[0],
-        repo: props.githubRepo.split('/')[1],
-        branchOrRef: githubBranch,
-        cloneDepth: 1,
-        webhook: false,
-        reportBuildStatus: false,
-      }),
+      // NOTE: We don't specify source here - buildspec will clone the repo
+      // This avoids GitHub OAuth requirements for public repos
 
       // Build environment
       environment: {
@@ -278,11 +271,19 @@ export class CodeBuildStack extends cdk.Stack {
             type: codebuild.BuildEnvironmentVariableType.PLAINTEXT,
             value: 'latest',
           },
+          GITHUB_REPO: {
+            type: codebuild.BuildEnvironmentVariableType.PLAINTEXT,
+            value: props.githubRepo,
+          },
+          GITHUB_BRANCH: {
+            type: codebuild.BuildEnvironmentVariableType.PLAINTEXT,
+            value: githubBranch,
+          },
         },
       },
 
-      // Buildspec location
-      buildSpec: codebuild.BuildSpec.fromSourceFilename('buildspec.yml'),
+      // Inline buildspec with git clone
+      buildSpec: codebuild.BuildSpec.fromAsset('../buildspec.yml'),
 
       // Artifacts
       artifacts: codebuild.Artifacts.s3({
