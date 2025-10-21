@@ -166,6 +166,7 @@ export class CodeBuildStack extends cdk.Stack {
           'ec2:DescribeSecurityGroups',
           'ec2:DescribeRouteTables',
           'ec2:DescribeNetworkInterfaces',
+          'ec2:DescribeAvailabilityZones',
           'ec2:CreateTags',
           'ec2:DeleteSecurityGroup',
           'ec2:AuthorizeSecurityGroupIngress',
