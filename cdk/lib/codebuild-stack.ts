@@ -336,7 +336,7 @@ export class CodeBuildStack extends cdk.Stack {
       description: 'S3 bucket for build artifacts',
     });
 
-    new cdk.CfnOutput(this, 'BuildLogGroup', {
+    new cdk.CfnOutput(this, 'BuildLogGroupName', {
       value: logGroup.logGroupName,
       description: 'CloudWatch log group for builds',
     });
