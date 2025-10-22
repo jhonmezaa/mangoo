@@ -189,9 +189,13 @@ export class MangooStack extends cdk.Stack {
         BEDROCK_REGION: this.region,
         BEDROCK_MODEL_ID: 'anthropic.claude-3-5-sonnet-20241022-v2:0',
         BEDROCK_EMBEDDING_MODEL_ID: 'amazon.titan-embed-text-v2:0',
+        DB_HOST: dbCluster.clusterEndpoint.hostname,
+        DB_PORT: '5432',
+        DB_NAME: 'mangoo',
+        DB_USER: 'postgres',
       },
       secrets: {
-        DATABASE_URL: ecs.Secret.fromSecretsManager(dbPasswordSecret, 'password'),
+        DB_PASSWORD: ecs.Secret.fromSecretsManager(dbPasswordSecret, 'password'),
         SECRET_KEY: ecs.Secret.fromSecretsManager(dbPasswordSecret, 'password'),
       },
     });

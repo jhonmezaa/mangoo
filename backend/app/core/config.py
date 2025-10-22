@@ -19,7 +19,12 @@ class Settings(BaseSettings):
     ALLOWED_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:5173"]
 
     # Database
-    DATABASE_URL: str
+    DATABASE_URL: Optional[str] = None
+    DB_HOST: Optional[str] = None
+    DB_PORT: str = "5432"
+    DB_NAME: Optional[str] = None
+    DB_USER: Optional[str] = None
+    DB_PASSWORD: Optional[str] = None
     DB_POOL_SIZE: int = 20
     DB_MAX_OVERFLOW: int = 10
     DB_POOL_TIMEOUT: int = 30
@@ -59,6 +64,14 @@ class Settings(BaseSettings):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+
+        # Build DATABASE_URL from components if not provided
+        if not self.DATABASE_URL and all([self.DB_HOST, self.DB_NAME, self.DB_USER, self.DB_PASSWORD]):
+            self.DATABASE_URL = (
+                f"postgresql://{self.DB_USER}:{self.DB_PASSWORD}@"
+                f"{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
+            )
+
         # Auto-generate Cognito issuer if not provided
         if not self.COGNITO_ISSUER:
             self.COGNITO_ISSUER = (
