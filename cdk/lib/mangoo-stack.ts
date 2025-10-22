@@ -218,6 +218,7 @@ export class MangooStack extends cdk.Stack {
     );
 
     // Backend Service
+    // Note: Deployment may take 10-15 minutes on first run while Aurora initializes
     const backendService = new ecs.FargateService(this, 'BackendService', {
       cluster,
       taskDefinition: backendTaskDefinition,
@@ -227,11 +228,14 @@ export class MangooStack extends cdk.Stack {
         subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
       },
       securityGroups: [backendSecurityGroup],
-      healthCheckGracePeriod: cdk.Duration.seconds(60),
+      healthCheckGracePeriod: cdk.Duration.minutes(10), // Extended for Aurora cold start
       circuitBreaker: {
-        rollback: true,
+        rollback: false, // Disable rollback to allow retries during Aurora initialization
       },
     });
+
+    // Ensure backend service waits for database to be available
+    backendService.node.addDependency(dbCluster);
 
     // Auto Scaling
     const backendScaling = backendService.autoScaleTaskCount({

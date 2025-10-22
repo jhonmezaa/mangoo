@@ -17,8 +17,26 @@ async def lifespan(app: FastAPI):
     """Application lifespan manager."""
     # Startup
     print("🚀 Starting Mangoo AI Platform...")
-    await init_db()
-    print("✅ Database initialized")
+
+    # Try to initialize database with retry logic
+    max_retries = 30
+    retry_delay = 10  # seconds
+    for attempt in range(max_retries):
+        try:
+            await init_db()
+            print("✅ Database initialized")
+            break
+        except Exception as e:
+            if attempt < max_retries - 1:
+                print(f"⚠️  Database connection attempt {attempt + 1}/{max_retries} failed: {e}")
+                print(f"   Retrying in {retry_delay} seconds...")
+                import asyncio
+                await asyncio.sleep(retry_delay)
+            else:
+                print(f"❌ Failed to initialize database after {max_retries} attempts")
+                print(f"   Last error: {e}")
+                print("   Application will continue but database operations will fail")
+
     yield
     # Shutdown
     print("👋 Shutting down...")
